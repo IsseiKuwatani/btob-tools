@@ -75,13 +75,22 @@ export async function uploadImage(
   title: string,
   threadTs?: string
 ): Promise<void> {
-  await slackClient.filesUploadV2({
-    channel_id: channel,
-    file: imageBuffer,
-    filename,
-    title,
-    thread_ts: threadTs,
-  });
+  if (threadTs) {
+    await slackClient.filesUploadV2({
+      channel_id: channel,
+      file: imageBuffer,
+      filename,
+      title,
+      thread_ts: threadTs,
+    });
+  } else {
+    await slackClient.filesUploadV2({
+      channel_id: channel,
+      file: imageBuffer,
+      filename,
+      title,
+    });
+  }
 }
 
 /**
