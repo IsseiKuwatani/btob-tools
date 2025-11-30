@@ -1,4 +1,4 @@
-import { WebClient } from "@slack/web-api";
+import { WebClient, KnownBlock } from "@slack/web-api";
 import crypto from "crypto";
 
 // Slack Web API クライアント
@@ -53,7 +53,7 @@ export async function sendMessage(
  */
 export async function sendRichMessage(
   channel: string,
-  blocks: object[],
+  blocks: KnownBlock[],
   text: string,
   threadTs?: string
 ): Promise<void> {
