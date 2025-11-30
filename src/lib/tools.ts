@@ -8,6 +8,7 @@ export interface Tool {
   features: string[];
   isNew?: boolean;
   comingSoon?: boolean;
+  isDemo?: boolean;
 }
 
 export type ToolCategory = 
@@ -15,17 +16,73 @@ export type ToolCategory =
   | "diagnostic" // 診断ツール
   | "calculator" // 計算ツール
   | "comparison" // 比較ツール
-  | "checklist"; // チェックリスト
+  | "conversion";// CVR向上施策
 
 export const categoryLabels: Record<ToolCategory, string> = {
   simulator: "シミュレーター",
   diagnostic: "診断ツール",
   calculator: "計算ツール",
   comparison: "比較ツール",
-  checklist: "チェックリスト",
+  conversion: "CVR向上施策",
 };
 
 export const tools: Tool[] = [
+  // CVR向上施策（デモ）
+  {
+    id: "7",
+    slug: "gated-whitepaper",
+    name: "ゲート付きホワイトペーパー",
+    description: "途中まで無料で見せて、続きはメアド入力で解放。リード獲得率が劇的に向上します。",
+    category: "conversion",
+    iconName: "roi-simulator",
+    features: ["途中でフォーム表示", "読了率トラッキング", "段階的な情報開示"],
+    isNew: true,
+    isDemo: true,
+  },
+  {
+    id: "8",
+    slug: "exit-popup",
+    name: "離脱検知ポップアップ",
+    description: "マウスが画面外に出た瞬間にポップアップ表示。離脱直前のユーザーをキャッチします。",
+    category: "conversion",
+    iconName: "plan-selector",
+    features: ["離脱検知機能", "カスタマイズ可能", "コンバージョン率向上"],
+    isNew: true,
+    isDemo: true,
+  },
+  {
+    id: "9",
+    slug: "chat-form",
+    name: "チャット形式フォーム",
+    description: "対話形式で情報を収集。フォームっぽくないUIで入力完了率を大幅アップ。",
+    category: "conversion",
+    iconName: "security-check",
+    features: ["会話形式UI", "ステップ入力", "離脱率低減"],
+    isNew: true,
+    isDemo: true,
+  },
+  // 表形式シミュレーション
+  {
+    id: "10",
+    slug: "budget-simulator",
+    name: "マーケティング予算配分シミュレーター",
+    description: "チャネル別に予算を配分し、予想リード数・CPA・ROIを表形式で比較シミュレーションします。",
+    category: "simulator",
+    iconName: "dx-maturity",
+    features: ["マルチチャネル対応", "表形式で一括比較", "最適配分の提案"],
+    isNew: true,
+  },
+  {
+    id: "11",
+    slug: "annual-plan",
+    name: "年間マーケティングプラン作成",
+    description: "12ヶ月×5チャネルの表形式で年間計画を策定。目標達成率やギャップ分析まで一括管理します。",
+    category: "simulator",
+    iconName: "dx-maturity",
+    features: ["月別・チャネル別入力", "四半期サマリー", "ギャップ分析"],
+    isNew: true,
+  },
+  // 計算・シミュレーションツール
   {
     id: "1",
     slug: "roi-simulator",
@@ -34,7 +91,6 @@ export const tools: Tool[] = [
     category: "simulator",
     iconName: "roi-simulator",
     features: ["月間・年間の削減額算出", "グラフ可視化", "5年間の累計効果"],
-    isNew: true,
   },
   {
     id: "2",
@@ -44,7 +100,6 @@ export const tools: Tool[] = [
     category: "diagnostic",
     iconName: "dx-maturity",
     features: ["5段階評価", "レーダーチャート", "改善提案付き"],
-    isNew: true,
   },
   {
     id: "3",
@@ -54,7 +109,6 @@ export const tools: Tool[] = [
     category: "comparison",
     iconName: "cost-calculator",
     features: ["詳細な費用項目", "5年間のTCO計算", "損益分岐点表示"],
-    isNew: true,
   },
   {
     id: "4",
@@ -63,8 +117,7 @@ export const tools: Tool[] = [
     description: "広告費とCV率から、リード獲得単価と必要予算を算出します。",
     category: "calculator",
     iconName: "roi-simulator",
-    features: ["CPA自動計算", "目標達成に必要な予算", "チャネル別比較"],
-    isNew: true,
+    features: ["CPA自動計算", "目標達成に必要な予算", "CVR改善効果"],
   },
   {
     id: "5",
@@ -74,7 +127,6 @@ export const tools: Tool[] = [
     category: "calculator",
     iconName: "dx-maturity",
     features: ["ファネル別の必要数算出", "改善インパクト表示", "ボトルネック特定"],
-    isNew: true,
   },
   {
     id: "6",
@@ -84,7 +136,6 @@ export const tools: Tool[] = [
     category: "simulator",
     iconName: "plan-selector",
     features: ["改善前後の比較", "年間売上インパクト", "投資対効果の算出"],
-    isNew: true,
   },
 ];
 
