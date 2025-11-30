@@ -2,7 +2,11 @@ import { WebClient, KnownBlock } from "@slack/web-api";
 import crypto from "crypto";
 
 // Slack Web API クライアント
-export const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+const token = process.env.SLACK_BOT_TOKEN;
+if (!token) {
+  console.warn("⚠️ SLACK_BOT_TOKEN is not set!");
+}
+export const slackClient = new WebClient(token);
 
 /**
  * Slackリクエストの署名を検証
@@ -41,11 +45,18 @@ export async function sendMessage(
   text: string,
   threadTs?: string
 ): Promise<void> {
-  await slackClient.chat.postMessage({
-    channel,
-    text,
-    thread_ts: threadTs,
-  });
+  console.log("Sending message to channel:", channel, "text:", text.substring(0, 50));
+  try {
+    const result = await slackClient.chat.postMessage({
+      channel,
+      text,
+      thread_ts: threadTs,
+    });
+    console.log("Message sent successfully:", result.ok);
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    throw error;
+  }
 }
 
 /**

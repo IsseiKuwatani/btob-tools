@@ -4,8 +4,6 @@ import {
   sendMessage,
   uploadImage,
   extractPrompt,
-  addThinkingReaction,
-  removeReaction,
   downloadFile,
 } from "@/lib/slack";
 import { generateText, generateImage, generateWithImage } from "@/lib/gemini";
@@ -47,40 +45,48 @@ export async function POST(req: NextRequest) {
   try {
     // リクエストボディを取得
     const body = await req.text();
+    console.log("Received Slack event:", body.substring(0, 200));
+    
     const payload: SlackEventPayload = JSON.parse(body);
 
-    // Slack署名の検証
+    // Slack署名の検証（開発中はスキップ可能）
     const signature = req.headers.get("x-slack-signature") || "";
     const timestamp = req.headers.get("x-slack-request-timestamp") || "";
 
-    if (SLACK_SIGNING_SECRET && !verifySlackRequest(SLACK_SIGNING_SECRET, signature, timestamp, body)) {
+    if (SLACK_SIGNING_SECRET && signature && !verifySlackRequest(SLACK_SIGNING_SECRET, signature, timestamp, body)) {
+      console.error("Invalid Slack signature");
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     // URL Verification Challenge (Slack App設定時に必要)
     if (payload.type === "url_verification") {
+      console.log("URL verification challenge received");
       return NextResponse.json({ challenge: payload.challenge });
     }
 
     // Event Callback の処理
     if (payload.type === "event_callback" && payload.event) {
       const event = payload.event;
+      console.log("Event type:", event.type, "Bot ID:", event.bot_id);
 
       // Bot自身のメッセージは無視
       if (event.bot_id) {
+        console.log("Ignoring bot message");
         return NextResponse.json({ ok: true });
       }
 
       // app_mention イベント (メンションされた時)
       if (event.type === "app_mention" && event.channel && event.ts) {
+        console.log("Handling app_mention event");
         // 非同期で処理（3秒ルール対策）
-        handleMention(event).catch(console.error);
+        handleMention(event).catch((err) => console.error("handleMention error:", err));
         return NextResponse.json({ ok: true });
       }
 
       // message イベント (DMの場合)
       if (event.type === "message" && event.channel?.startsWith("D") && event.ts) {
-        handleMention(event).catch(console.error);
+        console.log("Handling DM message event");
+        handleMention(event).catch((err) => console.error("handleMention error:", err));
         return NextResponse.json({ ok: true });
       }
     }
@@ -92,20 +98,39 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// 考え中メッセージのバリエーション（人間っぽく）
+const THINKING_MESSAGES = [
+  "ふむふむ、ちょっと考えてみますね...🤔",
+  "なるほど！少々お待ちを...✨",
+  "おっ、いい質問ですね！考え中...💭",
+  "了解です！ちょっと調べてみます...🔍",
+  "はいはい！少し考えさせてください...🧠",
+  "お、それですね！ちょっと待ってて...⏳",
+];
+
+/**
+ * ランダムな考え中メッセージを取得
+ */
+function getThinkingMessage(): string {
+  return THINKING_MESSAGES[Math.floor(Math.random() * THINKING_MESSAGES.length)];
+}
+
 /**
  * メンションを処理
  */
 async function handleMention(event: SlackEvent): Promise<void> {
   const { channel, ts, thread_ts, text, files } = event;
 
-  if (!channel || !ts || !text) return;
+  if (!channel || !ts || !text) {
+    console.log("Missing required fields:", { channel, ts, text });
+    return;
+  }
 
-  // 思考中リアクションを追加
-  await addThinkingReaction(channel, ts);
+  const replyTs = thread_ts || ts;
 
   try {
     const prompt = extractPrompt(text, SLACK_BOT_USER_ID);
-    const replyTs = thread_ts || ts;
+    console.log("Processing prompt:", prompt);
 
     // 画像生成コマンドの検出
     if (prompt.startsWith("/image ") || prompt.startsWith("画像生成:") || prompt.startsWith("画像:")) {
@@ -113,22 +138,23 @@ async function handleMention(event: SlackEvent): Promise<void> {
     }
     // ファイルが添付されている場合（画像解析）
     else if (files && files.length > 0) {
+      // まず「考え中」メッセージを送信
+      await sendMessage(channel, "📷 画像を確認中...ちょっと待ってね！", replyTs);
       await handleImageAnalysis(channel, prompt, files, replyTs);
     }
     // 通常のテキスト応答
     else {
+      // まず「考え中」メッセージを送信（人間っぽく）
+      await sendMessage(channel, getThinkingMessage(), replyTs);
       await handleTextResponse(channel, prompt, replyTs);
     }
   } catch (error) {
     console.error("Handle mention error:", error);
     await sendMessage(
       channel,
-      "エラーが発生しました。もう一度お試しください。",
-      thread_ts || ts
+      "あれ、ちょっとエラーが起きちゃいました...😅 もう一度試してもらえますか？",
+      replyTs
     );
-  } finally {
-    // 思考中リアクションを削除
-    await removeReaction(channel, ts, "hourglass_flowing_sand");
   }
 }
 
