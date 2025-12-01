@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   verifySlackRequest,
   sendMessage,
@@ -96,15 +97,27 @@ export async function POST(req: NextRequest) {
       // app_mention イベント (メンションされた時)
       if (event.type === "app_mention" && event.channel && event.ts) {
         console.log("Handling app_mention event");
-        // 非同期で処理（3秒ルール対策）
-        handleMention(event).catch((err) => console.error("handleMention error:", err));
+        // after() を使ってバックグラウンドで確実に処理を完了させる
+        after(async () => {
+          try {
+            await handleMention(event);
+          } catch (err) {
+            console.error("handleMention error:", err);
+          }
+        });
         return NextResponse.json({ ok: true });
       }
 
       // message イベント (DMの場合)
       if (event.type === "message" && event.channel?.startsWith("D") && event.ts) {
         console.log("Handling DM message event");
-        handleMention(event).catch((err) => console.error("handleMention error:", err));
+        after(async () => {
+          try {
+            await handleMention(event);
+          } catch (err) {
+            console.error("handleMention error:", err);
+          }
+        });
         return NextResponse.json({ ok: true });
       }
     }
@@ -150,21 +163,37 @@ async function handleMention(event: SlackEvent): Promise<void> {
     const prompt = extractPrompt(text, SLACK_BOT_USER_ID);
     console.log("Processing prompt:", prompt);
 
-    // 画像生成コマンドの検出
-    if (prompt.startsWith("/image ") || prompt.startsWith("画像生成:") || prompt.startsWith("画像:")) {
+    // 画像生成コマンドの検出（自然な言い方にも対応）
+    const isImageRequest = 
+      prompt.startsWith("/image ") || 
+      prompt.startsWith("画像生成:") || 
+      prompt.startsWith("画像:") ||
+      prompt.includes("画像を生成") ||
+      prompt.includes("画像生成して") ||
+      prompt.includes("イラストを生成") ||
+      prompt.includes("絵を描いて");
+
+    if (isImageRequest) {
+      console.log("Detected as image generation request");
       await handleImageGeneration(channel, prompt, replyTs);
     }
     // ファイルが添付されている場合（画像解析）
     else if (files && files.length > 0) {
+      console.log("Detected as image analysis request");
       // まず「考え中」メッセージを送信
       await sendMessage(channel, "📷 画像を確認中...ちょっと待ってね！", replyTs);
       await handleImageAnalysis(channel, prompt, files, replyTs);
     }
     // 通常のテキスト応答
     else {
+      console.log("Detected as text response request");
       // まず「考え中」メッセージを送信（人間っぽく）
-      await sendMessage(channel, getThinkingMessage(), replyTs);
+      const thinkingMsg = getThinkingMessage();
+      console.log("Sending thinking message:", thinkingMsg);
+      await sendMessage(channel, thinkingMsg, replyTs);
+      console.log("Thinking message sent, calling handleTextResponse");
       await handleTextResponse(channel, prompt, replyTs);
+      console.log("handleTextResponse completed");
     }
   } catch (error) {
     console.error("Handle mention error:", error);
@@ -212,12 +241,24 @@ async function handleImageGeneration(
   prompt: string,
   threadTs: string
 ): Promise<void> {
-  // プレフィックスを除去
-  const imagePrompt = prompt
+  console.log("handleImageGeneration started with prompt:", prompt);
+  
+  // プレフィックスや自然な言い回しを除去してプロンプトを抽出
+  let imagePrompt = prompt
     .replace(/^\/image\s+/, "")
     .replace(/^画像生成:\s*/, "")
     .replace(/^画像:\s*/, "")
+    .replace(/の?画像を生成して(ほしい|ください|くれ)?[！!]?/g, "")
+    .replace(/の?イラストを生成して(ほしい|ください|くれ)?[！!]?/g, "")
+    .replace(/の?絵を描いて(ほしい|ください|くれ)?[！!]?/g, "")
     .trim();
+  
+  // もしプロンプトが空になったら元のプロンプトを使う
+  if (!imagePrompt) {
+    imagePrompt = prompt;
+  }
+  
+  console.log("Cleaned image prompt:", imagePrompt);
 
   if (!imagePrompt) {
     await sendMessage(
