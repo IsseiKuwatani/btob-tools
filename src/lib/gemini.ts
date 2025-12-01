@@ -12,10 +12,15 @@ const IMAGE_MODEL = "gemini-3-pro-image-preview";
  */
 export async function generateText(prompt: string): Promise<string> {
   try {
+    console.log("generateText: Starting with model:", TEXT_MODEL);
+    console.log("generateText: API Key exists:", !!process.env.GEMINI_API_KEY);
+    
     const response = await ai.models.generateContent({
       model: TEXT_MODEL,
       contents: prompt,
     });
+    
+    console.log("generateText: Response received");
     return response.text ?? "";
   } catch (error) {
     console.error("Gemini text generation error:", error);

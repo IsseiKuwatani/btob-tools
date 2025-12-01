@@ -189,7 +189,9 @@ async function handleTextResponse(
     return;
   }
 
+  console.log("Calling generateText with prompt:", prompt.substring(0, 50));
   const response = await generateText(prompt);
+  console.log("generateText response received, length:", response.length);
   
   // 長いメッセージは分割
   if (response.length > 3000) {
