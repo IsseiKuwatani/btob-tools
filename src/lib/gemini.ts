@@ -108,27 +108,36 @@ export async function generateWithSystemPrompt(
 /**
  * 画像を参照して新しい画像を生成（Image-to-Image）
  * Nano Banana Pro (Gemini 3 Pro) のImage-to-Image機能
+ * 複数画像にも対応（顔写真+ロゴなど）
  * 参考: https://www.fotor.com/jp/blog/nano-banana-model-prompts/
  */
 export async function generateImageFromReference(
   prompt: string,
-  referenceImageBase64: string,
-  mimeType: string = "image/png"
+  referenceImages: { base64: string; mimeType: string }[]
 ): Promise<string | null> {
   try {
     console.log("generateImageFromReference: Starting with model:", IMAGE_MODEL);
+    console.log("generateImageFromReference: Number of images:", referenceImages.length);
+    
+    // コンテンツを構築（画像 + テキスト）
+    const contents: Array<{ inlineData: { data: string; mimeType: string } } | { text: string }> = [];
+    
+    // 全ての参照画像を追加
+    for (const img of referenceImages) {
+      contents.push({
+        inlineData: {
+          data: img.base64,
+          mimeType: img.mimeType,
+        },
+      });
+    }
+    
+    // プロンプトを追加
+    contents.push({ text: prompt });
     
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL,
-      contents: [
-        {
-          inlineData: {
-            data: referenceImageBase64,
-            mimeType: mimeType,
-          },
-        },
-        { text: prompt },
-      ],
+      contents: contents,
     });
 
     console.log("generateImageFromReference: Response received");

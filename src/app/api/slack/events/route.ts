@@ -171,9 +171,13 @@ async function handleMention(event: SlackEvent): Promise<void> {
       prompt.includes("画像を生成") ||
       prompt.includes("画像生成して") ||
       prompt.includes("イラストを生成") ||
-      prompt.includes("絵を描いて");
+      prompt.includes("絵を描いて") ||
+      prompt.includes("バナーを作") ||
+      prompt.includes("バナー作成") ||
+      prompt.includes("ポスターを作") ||
+      prompt.includes("デザインを作");
 
-    // 画像参照での生成（Image-to-Image）
+    // 画像参照での生成（Image-to-Image）- 画像添付時に制作系のキーワードがあれば
     const isImageToImage = 
       files && files.length > 0 && (
         prompt.includes("参考にして") ||
@@ -184,8 +188,17 @@ async function handleMention(event: SlackEvent): Promise<void> {
         prompt.includes("変換して") ||
         prompt.includes("アレンジして") ||
         prompt.includes("リメイクして") ||
+        prompt.includes("制作") ||
+        prompt.includes("作成") ||
+        prompt.includes("作って") ||
+        prompt.includes("を使って") ||
+        prompt.includes("使用して") ||
+        prompt.includes("バナー") ||
+        prompt.includes("ポスター") ||
+        prompt.includes("デザイン") ||
         prompt.startsWith("/remix ") ||
-        prompt.startsWith("/style ")
+        prompt.startsWith("/style ") ||
+        prompt.startsWith("/create ")
       );
 
     if (isImageToImage && files && files.length > 0) {
@@ -338,19 +351,25 @@ async function handleImageToImage(
     return;
   }
 
-  console.log("handleImageToImage: Downloading reference image");
+  console.log("handleImageToImage: Downloading reference image(s)");
   
-  // 参照画像をダウンロード
-  const imageBuffer = await downloadFile(imageFile.url_private);
-  const imageBase64 = imageBuffer.toString("base64");
+  // 全ての画像をダウンロード
+  const imageFiles = files.filter((f) => f.mimetype.startsWith("image/"));
+  const imageDataList: { base64: string; mimeType: string }[] = [];
+  
+  for (const file of imageFiles) {
+    const buffer = await downloadFile(file.url_private);
+    imageDataList.push({
+      base64: buffer.toString("base64"),
+      mimeType: file.mimetype,
+    });
+  }
 
-  // プロンプトを整理
+  // プロンプトを整理（コマンドプレフィックスのみ除去、内容はそのまま）
   let imagePrompt = prompt
     .replace(/^\/remix\s+/, "")
     .replace(/^\/style\s+/, "")
-    .replace(/を?参考にして/g, "")
-    .replace(/を?元に/g, "")
-    .replace(/を?ベースに/g, "")
+    .replace(/^\/create\s+/, "")
     .trim();
 
   // プロンプトが空の場合はデフォルト
@@ -358,12 +377,12 @@ async function handleImageToImage(
     imagePrompt = "この画像を参考にして、より美しくアレンジしてください";
   }
 
-  console.log("handleImageToImage: Generating with prompt:", imagePrompt);
+  console.log("handleImageToImage: Generating with prompt length:", imagePrompt.length);
+  console.log("handleImageToImage: Number of reference images:", imageDataList.length);
 
   const generatedImageBase64 = await generateImageFromReference(
     imagePrompt,
-    imageBase64,
-    imageFile.mimetype
+    imageDataList
   );
 
   if (generatedImageBase64) {
@@ -372,20 +391,21 @@ async function handleImageToImage(
       channel,
       generatedBuffer,
       "generated-image.png",
-      `参照生成: ${imagePrompt}`,
+      `生成画像`,
       threadTs
     );
-    await sendMessage(channel, `✨ 画像を参考にして生成しました！「${imagePrompt}」`, threadTs);
+    await sendMessage(channel, `✨ 画像を参考にして生成しました！`, threadTs);
   } else {
     // 画像生成に失敗した場合は説明を生成
+    const firstImage = imageDataList[0];
     const description = await generateWithImage(
-      `この画像を「${imagePrompt}」というリクエストに基づいてどのように変換・アレンジすべきか、詳細に説明してください。`,
-      imageBase64,
-      imageFile.mimetype
+      `あなたはプロのデザイナーです。以下のリクエストに基づいて、どのようなデザインを作成すべきか、具体的なデザイン案を詳細に説明してください:\n\n${imagePrompt}`,
+      firstImage.base64,
+      firstImage.mimeType
     );
     await sendMessage(
       channel,
-      `⚠️ 画像生成機能は現在利用できません。代わりに提案を生成しました:\n\n${description}`,
+      `⚠️ 画像生成機能は現在利用できません。代わりにデザイン案を提案します:\n\n${description}`,
       threadTs
     );
   }
