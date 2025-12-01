@@ -41,6 +41,24 @@ interface SlackEventPayload {
 const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET || "";
 const SLACK_BOT_USER_ID = process.env.SLACK_BOT_USER_ID || "";
 
+// GETリクエスト - 動作確認用
+export async function GET() {
+  const hasToken = !!process.env.SLACK_BOT_TOKEN;
+  const hasSecret = !!process.env.SLACK_SIGNING_SECRET;
+  const hasBotId = !!process.env.SLACK_BOT_USER_ID;
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  
+  return NextResponse.json({
+    status: "子分1号 is ready! 🤖",
+    env: {
+      SLACK_BOT_TOKEN: hasToken ? "✅ Set" : "❌ Missing",
+      SLACK_SIGNING_SECRET: hasSecret ? "✅ Set" : "❌ Missing",
+      SLACK_BOT_USER_ID: hasBotId ? "✅ Set" : "❌ Missing",
+      GEMINI_API_KEY: hasGemini ? "✅ Set" : "❌ Missing",
+    }
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     // リクエストボディを取得

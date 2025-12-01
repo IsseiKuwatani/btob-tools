@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, Part } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 // Gemini クライアントの初期化
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
@@ -25,27 +25,22 @@ export async function generateText(prompt: string): Promise<string> {
 
 /**
  * Geminiで画像を生成（Gemini 3 Pro Image Preview）
+ * 参考: https://ai.google.dev/gemini-api/docs/image-generation?hl=ja
  */
 export async function generateImage(prompt: string): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL,
       contents: prompt,
-      config: {
-        responseModalities: [Modality.IMAGE, Modality.TEXT],
-        imageConfig: {
-          aspectRatio: "16:9",
-          imageSize: "2K",
-        },
-      },
     });
 
     // 画像データを取得
     const parts = response.candidates?.[0]?.content?.parts;
     if (parts && parts.length > 0) {
-      const imagePart = parts.find((part: Part) => part.inlineData);
-      if (imagePart?.inlineData?.data) {
-        return imagePart.inlineData.data; // Base64エンコードされた画像
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          return part.inlineData.data; // Base64エンコードされた画像
+        }
       }
     }
     return null;
@@ -104,4 +99,3 @@ export async function generateWithSystemPrompt(
     throw new Error("チャット生成に失敗しました");
   }
 }
-
