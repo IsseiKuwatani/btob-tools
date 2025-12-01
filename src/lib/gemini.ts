@@ -104,3 +104,50 @@ export async function generateWithSystemPrompt(
     throw new Error("チャット生成に失敗しました");
   }
 }
+
+/**
+ * 画像を参照して新しい画像を生成（Image-to-Image）
+ * Nano Banana Pro (Gemini 3 Pro) のImage-to-Image機能
+ * 参考: https://www.fotor.com/jp/blog/nano-banana-model-prompts/
+ */
+export async function generateImageFromReference(
+  prompt: string,
+  referenceImageBase64: string,
+  mimeType: string = "image/png"
+): Promise<string | null> {
+  try {
+    console.log("generateImageFromReference: Starting with model:", IMAGE_MODEL);
+    
+    const response = await ai.models.generateContent({
+      model: IMAGE_MODEL,
+      contents: [
+        {
+          inlineData: {
+            data: referenceImageBase64,
+            mimeType: mimeType,
+          },
+        },
+        { text: prompt },
+      ],
+    });
+
+    console.log("generateImageFromReference: Response received");
+
+    // 画像データを取得
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (parts && parts.length > 0) {
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          console.log("generateImageFromReference: Image data found");
+          return part.inlineData.data; // Base64エンコードされた画像
+        }
+      }
+    }
+    
+    console.log("generateImageFromReference: No image data in response");
+    return null;
+  } catch (error) {
+    console.error("Gemini image-to-image generation error:", error);
+    return null;
+  }
+}

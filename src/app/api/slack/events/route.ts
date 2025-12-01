@@ -7,7 +7,7 @@ import {
   extractPrompt,
   downloadFile,
 } from "@/lib/slack";
-import { generateText, generateImage, generateWithImage } from "@/lib/gemini";
+import { generateText, generateImage, generateWithImage, generateImageFromReference } from "@/lib/gemini";
 
 /**
  * 子分1号 - Slack × Gemini AI Bot
@@ -173,7 +173,27 @@ async function handleMention(event: SlackEvent): Promise<void> {
       prompt.includes("イラストを生成") ||
       prompt.includes("絵を描いて");
 
-    if (isImageRequest) {
+    // 画像参照での生成（Image-to-Image）
+    const isImageToImage = 
+      files && files.length > 0 && (
+        prompt.includes("参考にして") ||
+        prompt.includes("を元に") ||
+        prompt.includes("をベースに") ||
+        prompt.includes("風に") ||
+        prompt.includes("スタイルで") ||
+        prompt.includes("変換して") ||
+        prompt.includes("アレンジして") ||
+        prompt.includes("リメイクして") ||
+        prompt.startsWith("/remix ") ||
+        prompt.startsWith("/style ")
+      );
+
+    if (isImageToImage && files && files.length > 0) {
+      console.log("Detected as image-to-image request");
+      await sendMessage(channel, "🎨 画像を参考にして生成中...ちょっと待ってね！", replyTs);
+      await handleImageToImage(channel, prompt, files, replyTs);
+    }
+    else if (isImageRequest) {
       console.log("Detected as image generation request");
       await handleImageGeneration(channel, prompt, replyTs);
     }
@@ -290,6 +310,82 @@ async function handleImageGeneration(
     await sendMessage(
       channel,
       `⚠️ 画像生成機能は現在利用できません。代わりに説明を生成しました:\n\n${description}`,
+      threadTs
+    );
+  }
+}
+
+/**
+ * 画像を参照して新しい画像を生成（Image-to-Image）
+ * 参考: https://www.fotor.com/jp/blog/nano-banana-model-prompts/
+ */
+async function handleImageToImage(
+  channel: string,
+  prompt: string,
+  files: SlackFile[],
+  threadTs: string
+): Promise<void> {
+  const imageFile = files.find((f) =>
+    f.mimetype.startsWith("image/")
+  );
+
+  if (!imageFile) {
+    await sendMessage(
+      channel,
+      "画像ファイルを添付してください。",
+      threadTs
+    );
+    return;
+  }
+
+  console.log("handleImageToImage: Downloading reference image");
+  
+  // 参照画像をダウンロード
+  const imageBuffer = await downloadFile(imageFile.url_private);
+  const imageBase64 = imageBuffer.toString("base64");
+
+  // プロンプトを整理
+  let imagePrompt = prompt
+    .replace(/^\/remix\s+/, "")
+    .replace(/^\/style\s+/, "")
+    .replace(/を?参考にして/g, "")
+    .replace(/を?元に/g, "")
+    .replace(/を?ベースに/g, "")
+    .trim();
+
+  // プロンプトが空の場合はデフォルト
+  if (!imagePrompt) {
+    imagePrompt = "この画像を参考にして、より美しくアレンジしてください";
+  }
+
+  console.log("handleImageToImage: Generating with prompt:", imagePrompt);
+
+  const generatedImageBase64 = await generateImageFromReference(
+    imagePrompt,
+    imageBase64,
+    imageFile.mimetype
+  );
+
+  if (generatedImageBase64) {
+    const generatedBuffer = Buffer.from(generatedImageBase64, "base64");
+    await uploadImage(
+      channel,
+      generatedBuffer,
+      "generated-image.png",
+      `参照生成: ${imagePrompt}`,
+      threadTs
+    );
+    await sendMessage(channel, `✨ 画像を参考にして生成しました！「${imagePrompt}」`, threadTs);
+  } else {
+    // 画像生成に失敗した場合は説明を生成
+    const description = await generateWithImage(
+      `この画像を「${imagePrompt}」というリクエストに基づいてどのように変換・アレンジすべきか、詳細に説明してください。`,
+      imageBase64,
+      imageFile.mimetype
+    );
+    await sendMessage(
+      channel,
+      `⚠️ 画像生成機能は現在利用できません。代わりに提案を生成しました:\n\n${description}`,
       threadTs
     );
   }
